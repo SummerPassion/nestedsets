@@ -163,8 +163,9 @@ $nested->moveNear(7, 8);
 public function moveNear($id, $nearId, $position = 'after')
 ```
 
-**重建全表左右值和深度
+**重建全表左右值和深度**
 >适用于程序错误或人为改动将表破坏的情况
+
 ```php
 // 重建全表
 $nested = new NestedSets("user");
