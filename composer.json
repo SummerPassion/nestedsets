@@ -1,0 +1,19 @@
+{
+    "name": "mustang/nestedsets",
+    "description": "ThinkPHP5的nestendsets的扩展，参考了gmars的nestendsets，附加了rebuild方法。",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "summerpassion",
+            "email": "695998135@qq.com"
+        }
+    ],
+    "minimum-stability": "stable",
+    "require": {},
+    "autoload": {
+        "psr-4": {
+            "mustang\\nestedsets\\": "src"
+        }
+    }
+}
