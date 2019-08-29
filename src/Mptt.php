@@ -124,8 +124,8 @@ class Mptt
             throw new Exception('没有该节点');
         }
 
-        $condition[] = [$this->leftKey, $optionOne, $item[$this->leftKey]];
-        $condition[] = [$this->rightKey, $optionTwo, $item[$this->rightKey]];
+//        $condition[] = [$this->leftKey, $optionOne, $item[$this->leftKey]];
+//        $condition[] = [$this->rightKey, $optionTwo, $item[$this->rightKey]];
 //        return Db::table($this->tableName)
 //            ->where($condition)
 //            ->order("{$this->leftKey}")
