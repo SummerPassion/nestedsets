@@ -126,8 +126,13 @@ class Mptt
 
         $condition[] = [$this->leftKey, $optionOne, $item[$this->leftKey]];
         $condition[] = [$this->rightKey, $optionTwo, $item[$this->rightKey]];
+//        return Db::table($this->tableName)
+//            ->where($condition)
+//            ->order("{$this->leftKey}")
+//            ->select();
         return Db::table($this->tableName)
-            ->where($condition)
+            ->where($this->leftKey, $optionOne, $item[$this->leftKey])
+            ->where($this->rightKey, $optionTwo, $item[$this->rightKey])
             ->order("{$this->leftKey}")
             ->select();
     }
