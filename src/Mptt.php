@@ -4,6 +4,7 @@
  * DateTime: 2019/8/23 14:51
  * version 1.0.0
  */
+
 namespace mustang\nestedsets;
 
 
@@ -102,6 +103,8 @@ class Mptt
         isset($levelKey) && $this->levelKey = $levelKey;
     }
 
+    /************************** 向下查 **************************/
+
     /**
      * @return false|\PDOStatement|string|\think\Collection
      * 获取整棵树
@@ -114,43 +117,7 @@ class Mptt
     /**
      * @param $id
      * @return false|\PDOStatement|string|\think\Collection
-     * @throws Exception
-     * 获取当前节点的所有分支节点|不包含当前节点
-     */
-    public function getBranch($id, $optionOne = '>', $optionTwo = '<')
-    {
-        $item = $this->getItem($id);
-        if (!$item) {
-            throw new Exception('没有该节点');
-        }
-
-//        $condition[] = [$this->leftKey, $optionOne, $item[$this->leftKey]];
-//        $condition[] = [$this->rightKey, $optionTwo, $item[$this->rightKey]];
-//        return Db::table($this->tableName)
-//            ->where($condition)
-//            ->order("{$this->leftKey}")
-//            ->select();
-        return Db::table($this->tableName)
-            ->where($this->leftKey, $optionOne, $item[$this->leftKey])
-            ->where($this->rightKey, $optionTwo, $item[$this->rightKey])
-            ->order("{$this->leftKey}")
-            ->select();
-    }
-
-    /**
-     * @param $id
-     * @return false|\PDOStatement|string|\think\Collection
-     * 获取当前节点的所有分支节点 | 包含当前节点
-     */
-    public function getPath($id)
-    {
-        return $this->getBranch($id, ">=", "<=");
-    }
-
-    /**
-     * @param $id
-     * @return false|\PDOStatement|string|\think\Collection
-     * 获取该节点的所有子节点 | 注意是子节点，不包含孙节点等
+     * 获取该节点的所有直推节点
      */
     public function getChild($id)
     {
@@ -161,11 +128,162 @@ class Mptt
     }
 
     /**
+     * @param $id
+     * @param string $optionOne
+     * @param string $optionTwo
+     * @param int $lev_step 相对层级深度,非0则查询当前节点下$lev_step层
+     * @return false|\PDOStatement|string|\think\Collection
+     * @throws Exception
+     * @throws \think\db\exception\DataNotFoundException
+     * @throws \think\db\exception\ModelNotFoundException
+     * @throws \think\exception\DbException
+     * 获取当前节点的所有分支节点|不包含当前节点
+     */
+    public function getBranch($id, $lev_step = 0, $optionOne = '>', $optionTwo = '<')
+    {
+        $item = $this->getItem($id);
+        if (!$item) {
+            throw new Exception('没有该节点');
+        }
+        $current_lev = $item[$this->levelKey];
+        $level = $lev_step > 0 ? ['lev' => ['<=', $current_lev + $lev_step]] : [];
+        return Db::table($this->tableName)
+            ->where($level)
+            ->where($this->leftKey, $optionOne, $item[$this->leftKey])
+            ->where($this->rightKey, $optionTwo, $item[$this->rightKey])
+            ->order("{$this->leftKey}")
+            ->select();
+    }
+
+    /**
+     * @param $id
+     * @param $lev_step 相对层级
+     * @return false|\PDOStatement|string|\think\Collection
+     * 获取当前节点的所有分支节点 | 包含当前节点
+     */
+    public function getPath($id, $lev_step = 0)
+    {
+        return $this->getBranch($id, $lev_step, ">=", "<=");
+    }
+
+    /**
+     * 获取指定id的后代总数
+     * @param $id
+     * @return int|mixed
+     * @throws Exception
+     */
+    public function getBranchCount($id)
+    {
+        $item = $this->getItem($id);
+        if (!$item) {
+            throw new Exception('没有该节点');
+        }
+        return ($item[$this->rightKey] - $item[$this->leftKey] - 1) / 2;
+    }
+
+    /************************** 向上查 **************************/
+
+    /**
+     * @param $id
+     * @return false|\PDOStatement|string|\think\Collection
+     * 获取该节点的父级节点
+     */
+    public function getParent($id)
+    {
+        $item = $this->getItem($id);
+        if (!$item) {
+            throw new Exception('没有该节点');
+        }
+        return Db::table($this->tableName)
+            ->where($this->primaryKey, '=', $item[$this->parentKey])
+            ->order("{$this->leftKey}")
+            ->select();
+    }
+
+    /**
+     * 查询指定ID的上层节点
+     * @param $id
+     * @param $lev_step 相对层级深度,非0则查询当前节点下$lev_step层
+     * @return false|\PDOStatement|string|\think\Collection
+     * @throws Exception
+     * @throws \think\db\exception\DataNotFoundException
+     * @throws \think\db\exception\ModelNotFoundException
+     * @throws \think\exception\DbException
+     */
+    public function getParents($id, $lev_step = 0)
+    {
+        $item = $this->getItem($id);
+        if (!$item) {
+            throw new Exception('没有该节点');
+        }
+        $current_lev = $item[$this->levelKey];
+        $level = $lev_step > 0 ? ['lev'=>['between', [$current_lev - $lev_step, $current_lev]]] : [];
+        return Db::table($this->tableName)
+            ->where($level)
+            ->where($this->leftKey, '<', $item[$this->leftKey])
+            ->where($this->rightKey, '>', $item[$this->rightKey])
+            ->order("{$this->leftKey}")
+            ->select();
+    }
+
+    /************************** 中间查 **************************/
+
+    /**
+     * 判断两个节点是否属于同一条线
+     * @param $top_id
+     * @param $bottom_id
+     * @return bool
+     * @throws Exception
+     */
+    public function inOneLine($top_id, $bottom_id)
+    {
+        $top = $this->getItem($top_id);
+        $bottom = $this->getItem($bottom_id);
+        if ($top && $bottom) {
+            $range = Db::table($this->tableName)
+                ->where($this->leftKey, 'between', [$top[$this->leftKey], $bottom[$this->leftKey]])
+                ->where($this->rightKey, 'between', [$bottom[$this->rightKey], $top[$this->rightKey]])
+                ->column('id');
+            $ids = array_values($range);
+            return in_array($top_id, $ids) && in_array($bottom_id, $ids);
+        } else {
+            throw new Exception('节点号错误');
+        }
+    }
+
+    /**
+     * 给定顶点和底点,查询中间的所有节点
+     * @param $top_id 上层顶点的id
+     * @param $bottom_id 底层端点的id
+     * @return false|\PDOStatement|string|\think\Collection
+     * @throws Exception
+     * @throws \think\db\exception\DataNotFoundException
+     * @throws \think\db\exception\ModelNotFoundException
+     * @throws \think\exception\DbException
+     */
+    public function getRange($top_id, $bottom_id)
+    {
+        $top = $this->getItem($top_id);
+        $bottom = $this->getItem($bottom_id);
+        if ($top && $bottom) {
+            return Db::table($this->tableName)
+                ->where($this->leftKey, 'between', [$top[$this->leftKey], $bottom[$this->leftKey]])
+                ->where($this->rightKey, 'between', [$bottom[$this->rightKey], $top[$this->rightKey]])
+                ->order("{$this->leftKey}")
+                ->select();
+        } else {
+            throw new Exception('节点号错误');
+        }
+    }
+
+    /************************** 节点操作 **************************/
+
+    /**
      * @param $parentId
      * @param array $data
      * @param string $position top|bottom
      * @return int|string
-     * 添加新节点
+     * 添加新节点,$data中必须有键名为mid
      */
     public function insert($parentId, array $data = [], $position = "top")
     {
@@ -176,13 +294,13 @@ class Mptt
             $level = 1;
             if ($position == "top") {
                 $key = 1;
-            }else{
+            } else {
                 $key = Db::table($this->tableName)
-                        ->max("{$this->rightKey}")+1;
+                        ->max("{$this->rightKey}") + 1;
             }
-        }else{
-            $key = ($position == "top")? $parent[$this->leftKey]+1:$parent[$this->rightKey];
-            $level = $parent[$this->levelKey]+1;
+        } else {
+            $key = ($position == "top") ? $parent[$this->leftKey] + 1 : $parent[$this->rightKey];
+            $level = $parent[$this->levelKey] + 1;
         }
 
         Db::startTrans();
@@ -201,7 +319,7 @@ class Mptt
             Db::table($this->tableName)->insert($tmpData);
             Db::commit();
             return true;
-        }catch (Exception $e){
+        } catch (Exception $e) {
             Db::rollback();
             return false;
         }
@@ -211,7 +329,7 @@ class Mptt
      * @param $id
      * @return bool
      * @throws Exception
-     * 删除某个节点   包含了该节点的后代节点
+     * 删除某个节点以及所有伞下子节点
      */
     public function delete($id)
     {
@@ -220,22 +338,19 @@ class Mptt
             throw new Exception('没有该节点');
         }
 
-        $keyWidth = $item[$this->rightKey] - $item[$this->leftKey]+1;
-
-        //先删除节点及后代节点
-        $condition[] = [$this->leftKey, '>=', $item[$this->leftKey]];
-        $condition[] = [$this->rightKey, '<=', $item[$this->rightKey]];
+        $keyWidth = $item[$this->rightKey] - $item[$this->leftKey] + 1;
 
         try {
-            Db::table($this->tableName)
-                ->where($condition)->delete();
-
+            $del = Db::table($this->tableName)
+                ->where($this->leftKey, '>=', $item[$this->leftKey])
+                ->where($this->rightKey, '<=', $item[$this->rightKey])
+                ->delete();
             $sql = "UPDATE {$this->tableName} SET {$this->leftKey} = IF({$this->leftKey}>{$item[$this->leftKey]}, {$this->leftKey}-{$keyWidth}, {$this->leftKey}), {$this->rightKey} = {$this->rightKey}-{$keyWidth} WHERE {$this->rightKey}>{$item[$this->rightKey]}";
             //再移动节点
             Db::table($this->tableName)->query($sql);
 
             return true;
-        }catch (Exception $e){
+        } catch (Exception $e) {
             return false;
         }
     }
@@ -246,7 +361,7 @@ class Mptt
      * @param string $position bottom表示在后边插入   top表示开始插入
      * @return bool
      * @throws Exception
-     * 将一个节点移动到另个一节点下
+     * 将一个节点及其全部后代移动到另个一节点下,两者为父子级关系
      */
     public function moveUnder($id, $parentId, $position = "bottom")
     {
@@ -267,7 +382,7 @@ class Mptt
                 $nearKey = Db::table($this->tableName)
                     ->max("{$this->rightKey}");
             }
-        }else{
+        } else {
             $level = $parent[$this->levelKey] + 1;
             if ($position == 'top') {
                 $nearKey = $parent[$this->leftKey];
@@ -286,7 +401,7 @@ class Mptt
      * @param string $position
      * @return bool
      * @throws Exception
-     * 把主键为id的节点移动到主键为nearId的节点的前或者后
+     * 把主键为id的整条线移动到主键为nearId的节点的前或者后,两者隶属同一个父节点，两者互为兄弟节点
      */
     public function moveNear($id, $nearId, $position = 'after')
     {
@@ -331,11 +446,11 @@ class Mptt
             return false;
         }
 
-        $keyWidth = $item[$this->rightKey] - $item[$this->leftKey]+1;
-        $levelWidth = $level-$item[$this->levelKey];
+        $keyWidth = $item[$this->rightKey] - $item[$this->leftKey] + 1;
+        $levelWidth = $level - $item[$this->levelKey];
 
         if ($item[$this->rightKey] < $nearKey) {
-            $treeEdit = $nearKey - $item[$this->leftKey]+1-$keyWidth;
+            $treeEdit = $nearKey - $item[$this->leftKey] + 1 - $keyWidth;
             $sql = "UPDATE {$this->tableName} 
                     SET 
                     {$this->leftKey} = IF(
@@ -371,8 +486,8 @@ class Mptt
                     AND 
                     {$this->leftKey} <= {$nearKey}";
             Db::table($this->tableName)->query($sql);
-        }else{
-            $treeEdit = $nearKey - $item[$this->leftKey]+1;
+        } else {
+            $treeEdit = $nearKey - $item[$this->leftKey] + 1;
 
             $sql = "UPDATE {$this->tableName}
                     SET 
@@ -455,7 +570,7 @@ class Mptt
             throw new Exception("结构异常：根节点不止一个！");
         }
 
-        $this->rebuild_helper($root[0]['mid'], 1);
+        return $this->rebuild_helper($root[0]['mid'], 1);
     }
 
     /**
@@ -464,7 +579,7 @@ class Mptt
      * @param $lft
      * @param int $lev
      */
-    private function rebuild_helper($pk, $lft, $lev=0)
+    private function rebuild_helper($pk, $lft, $lev = 0)
     {
         $rht = $lft + 1;
 
@@ -473,14 +588,14 @@ class Mptt
         });
 
         if ($this->opt_ord["switch"]) {
-            array_multisort(array_column($child_ids,$this->opt_ord["flag"]),SORT_ASC, $child_ids);
+            array_multisort(array_column($child_ids, $this->opt_ord["flag"]), SORT_ASC, $child_ids);
         }
 
-        while(false != $piece = array_shift($child_ids)) {
+        while (false != $piece = array_shift($child_ids)) {
             $rht = $this->rebuild_helper($piece['mid'], $rht, $lev + 1);
         }
 
-        Db::table($this->tableName)->where(["mid"=>$pk])->update([
+        Db::table($this->tableName)->where(["mid" => $pk])->update([
             "lft" => $lft,
             "rht" => $rht,
             "lev" => $lev
