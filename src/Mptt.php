@@ -603,4 +603,35 @@ class Mptt
 
         return $rht + 1;
     }
+
+    /**
+     * 查询指定ID的上层ID集合
+     * @param $id 底层ID
+     * @param int $lev_step 相对层级
+     * @param bool $withSelf 默认不包含自己
+     * @return array
+     * @throws Exception
+     */
+    public function getParentIds($id, $lev_step = 0, $withSelf = false)
+    {
+        $item = $this->getItem($id);
+        if (!$item) {
+            throw new Exception('没有该节点');
+        }
+        if($withSelf){
+            $lt = '<=';
+            $gt = '>=';
+        }else{
+            $lt = '<';
+            $gt = '>';
+        }
+        $current_lev = $item[$this->levelKey];
+        $level = $lev_step > 0 ? ['lev'=>['between', [$current_lev - $lev_step, $current_lev]]] : [];
+        return Db::table($this->tableName)
+            ->where($level)
+            ->where($this->leftKey, $lt, $item[$this->leftKey])
+            ->where($this->rightKey, $gt, $item[$this->rightKey])
+            ->order("{$this->leftKey}")
+            ->column('mid');
+    }
 }
