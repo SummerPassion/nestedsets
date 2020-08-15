@@ -303,26 +303,18 @@ class Mptt
             $level = $parent[$this->levelKey] + 1;
         }
 
-        Db::startTrans();
         //更新其他节点
         $sql = "UPDATE {$this->tableName} SET {$this->rightKey} = {$this->rightKey}+2,{$this->leftKey} = IF({$this->leftKey}>={$key},{$this->leftKey}+2,{$this->leftKey}) WHERE {$this->rightKey}>={$key}";
-        try {
-            Db::table($this->tableName)
-                ->query($sql);
+        Db::table($this->tableName)
+            ->query($sql);
 
-            $newNode[$this->parentKey] = $parentId;
-            $newNode[$this->leftKey] = $key;
-            $newNode[$this->rightKey] = $key + 1;
-            $newNode[$this->levelKey] = $level;
-            $tmpData = array_merge($newNode, $data);
+        $newNode[$this->parentKey] = $parentId;
+        $newNode[$this->leftKey] = $key;
+        $newNode[$this->rightKey] = $key + 1;
+        $newNode[$this->levelKey] = $level;
+        $tmpData = array_merge($newNode, $data);
 
-            Db::table($this->tableName)->insert($tmpData);
-            Db::commit();
-            return true;
-        } catch (Exception $e) {
-            Db::rollback();
-            return false;
-        }
+        Db::table($this->tableName)->insert($tmpData);
     }
 
     /**

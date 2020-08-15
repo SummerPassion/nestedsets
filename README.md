@@ -75,16 +75,16 @@ class User extends Model
 
 ```php
 $userModel = new User();
-$nestedObj = new NestedSets($userModel);
+$nestedObj = new Mptt($userModel);
 ```
-这样就实例化了一个nestedsets对象，紧接着就可以调用其中的方法进行使用了。
+这样就实例化了一个Mptt对象，紧接着就可以调用其中的方法进行使用了。
 
 **实例化时传入配置参数：**
 
 其实上边直接配置已经很方便了。但是你不想在模型中配置该参数也可以在实例化时传入配置，例如：
 ```php
 $userModel = new User();
-$nested = new NestedSets($userModel, "lftkey", "rgtkey");
+$nested = new Mptt($userModel, "lftkey", "rgtkey");
 ```
 这种方式也是允许的，但是如果模型中的配置和直接传参都使用时模型中配置的参数不会生效只生效实例化时传入的参数。
 
@@ -96,7 +96,7 @@ $nested = new NestedSets($userModel, "lftkey", "rgtkey");
 
 ```php
 $userModel = new User();
-$nested = new NestedSets("user");
+$nested = new Mptt("user");
 ```
 需要注意的是，传入的表名必须是完整表名。这种方式如果要对字段配置只能在实例化时传入参数。
 
@@ -106,7 +106,7 @@ $nested = new NestedSets("user");
 ```php
 $data = ['name' => "Rose"];
 $parentId = 6;
-$nestedObj = new NestedSets("user");
+$nestedObj = new Mptt("user");
 $nestedObj->insert($parentId, $data);
 ```
 parentId是要创建节点的父亲节点。
@@ -129,7 +129,7 @@ public function insert($parentId, array $data = [], $position = "top")
 /**
 * 传入一个参数为要删除节点的id值
 */
-$nested = new NestedSets("user");
+$nested = new Mptt("user");
 $nested->delete(8);
 ```
 
@@ -141,7 +141,7 @@ $nested->delete(8);
 * 将id为7的节点移动到id为2的节点上
 * 如果要将id为7的节点移动为父节点那么第二个参数为0即可
 */
-$nested = new NestedSets("user");
+$nested = new Mptt("user");
 $nested->moveUnder(7, 2);
 
 //需要注意的是moveUnder支持三个参数。
@@ -154,7 +154,7 @@ public function moveUnder($id, $parentId, $position = "bottom")
 
 ```php
 //将id为7的节点移到id为8的节点旁，默认是之后
-$nested = new NestedSets("user");
+$nested = new Mptt("user");
 $nested->moveNear(7, 8);
 ```
 该方法的原型为：
@@ -168,7 +168,7 @@ public function moveNear($id, $nearId, $position = 'after')
 
 ```php
 // 重建全表
-$nested = new NestedSets("user");
+$nested = new Mptt("user");
 $nested->rebuildMptt();
 ```
 
